@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>AR Penari Papua (FBX Auto Dance)</title>
+    <meta name="description" content="Marker-Based AR dengan FBX Penari Papua otomatis menari dan kontrol Play/Pause" />
+    
+    <!-- A-Frame + AR.js -->
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+    <!-- Three.js + FBX Loader -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/examples/js/loaders/FBXLoader.js"></script>
+  </head>
+
+  <body style="margin: 0; overflow: hidden;">
+    <!-- Tombol kontrol -->
+    <div style="
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      gap: 10px;">
+      
+      <button id="play-button" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">
+        ▶️ Play
+      </button>
+      <button id="pause-button" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">
+        ⏸️ Pause
+      </button>
+    </div>
+
+    <!-- Scene AR -->
+    <a-scene embedded arjs>
+      <!-- Marker Hiro -->
+      <a-marker preset="hiro" id="hiroMarker">
+        <a-entity id="fbx-container" position="0 0 0" rotation="-90 0 0" scale="0.01 0.01 0.01"></a-entity>
+      </a-marker>
+      <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+      let mixer, clock = new THREE.Clock();
+      let isPlaying = false;
+      let model;
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const marker = document.querySelector('#hiroMarker');
+        const fbxContainer = document.querySelector('#fbx-container').object3D;
+        const scene = fbxContainer.parent; // akses ke THREE.Scene dari A-Frame
+        const playButton = document.getElementById('play-button');
+        const pauseButton = document.getElementById('pause-button');
+
+        // Cahaya
+        const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+        const directional = new THREE.DirectionalLight(0xffffff, 1.2);
+        directional.position.set(2, 4, 3);
+        scene.add(ambient);
+        scene.add(directional);
+
+        // Muat FBX
+        const loader = new THREE.FBXLoader();
+        loader.load('./PenariPapua.fbx', (object) => {
+          model = object;
+          object.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          });
+
+          // Auto scale menyesuaikan ukuran model
+          const box = new THREE.Box3().setFromObject(object);
+          const size = new THREE.Vector3();
+          box.getSize(size);
+          const scaleFactor = 1 / Math.max(size.x, size.y, size.z) * 1.5;
+          object.scale.setScalar(scaleFactor);
+
+          // Posisi model sedikit di atas marker
+          object.position.set(0, 0, 0);
+          object.rotation.x = -Math.PI / 2;
+
+          fbxContainer.add(object);
+
+          // Animasi dari Mixamo
+          if (object.animations && object.animations.length > 0) {
+            mixer = new THREE.AnimationMixer(object);
+            const action = mixer.clipAction(object.animations[0]);
+            action.play();
+            isPlaying = true;
+          }
+        });
+
+        // Update loop
+        const update = () => {
+          requestAnimationFrame(update);
+          if (mixer && isPlaying) mixer.update(clock.getDelta());
+
+          // Auto-rotate ringan agar terlihat dinamis
+          if (model && isPlaying) {
+            model.rotation.y += 0.005; // putar halus di sumbu Y
+          }
+        };
+        update();
+
+        // Otomatis play ketika marker ditemukan
+        marker.addEventListener('markerFound', () => {
+          console.log('Marker ditemukan — mulai menari!');
+          if (mixer) {
+            mixer.timeScale = 1;
+            isPlaying = true;
+          }
+        });
+
+        // Otomatis pause ketika marker hilang
+        marker.addEventListener('markerLost', () => {
+          console.log('Marker hilang — hentikan animasi.');
+          if (mixer) {
+            mixer.timeScale = 0;
+            isPlaying = false;
+          }
+        });
+
+        // Tombol kontrol manual
+        playButton.addEventListener('click', () => {
+          if (mixer) {
+            mixer.timeScale = 1;
+            isPlaying = true;
+          }
+        });
+
+        pauseButton.addEventListener('click', () => {
+          if (mixer) {
+            mixer.timeScale = 0;
+            isPlaying = false;
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
