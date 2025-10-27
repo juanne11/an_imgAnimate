@@ -1,19 +1,20 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>AR Penari Papua (FBX Auto Dance)</title>
-    <meta name="description" content="Marker-Based AR dengan FBX Penari Papua otomatis menari dan kontrol Play/Pause" />
-    
-    <!-- A-Frame + AR.js -->
+    <title>AR Penari Papua (FBX + Musik Yospan)</title>
+    <meta name="description" content="Marker-Based AR dengan Penari Papua FBX dan musik Yospan" />
+
+    <!-- A-Frame & AR.js -->
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
-    <!-- Three.js + FBX Loader -->
+    <!-- Three.js & FBX Loader -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.161.0/examples/js/loaders/FBXLoader.js"></script>
   </head>
 
   <body style="margin: 0; overflow: hidden;">
+
     <!-- Tombol kontrol -->
     <div style="
       position: absolute;
@@ -41,6 +42,9 @@
       <a-entity camera></a-entity>
     </a-scene>
 
+    <!-- Musik Yospan -->
+    <audio id="yospanAudio" src="./YospanMusic.mp3" preload="auto" loop></audio>
+
     <script>
       let mixer, clock = new THREE.Clock();
       let isPlaying = false;
@@ -49,9 +53,10 @@
       document.addEventListener('DOMContentLoaded', () => {
         const marker = document.querySelector('#hiroMarker');
         const fbxContainer = document.querySelector('#fbx-container').object3D;
-        const scene = fbxContainer.parent; // akses ke THREE.Scene dari A-Frame
+        const scene = fbxContainer.parent;
         const playButton = document.getElementById('play-button');
         const pauseButton = document.getElementById('pause-button');
+        const yospanAudio = document.getElementById('yospanAudio');
 
         // Cahaya
         const ambient = new THREE.AmbientLight(0xffffff, 0.8);
@@ -71,20 +76,18 @@
             }
           });
 
-          // Auto scale menyesuaikan ukuran model
+          // Auto-scale agar pas di marker
           const box = new THREE.Box3().setFromObject(object);
           const size = new THREE.Vector3();
           box.getSize(size);
           const scaleFactor = 1 / Math.max(size.x, size.y, size.z) * 1.5;
           object.scale.setScalar(scaleFactor);
 
-          // Posisi model sedikit di atas marker
           object.position.set(0, 0, 0);
           object.rotation.x = -Math.PI / 2;
-
           fbxContainer.add(object);
 
-          // Animasi dari Mixamo
+          // Animasi dari FBX
           if (object.animations && object.animations.length > 0) {
             mixer = new THREE.AnimationMixer(object);
             const action = mixer.clipAction(object.animations[0]);
@@ -97,38 +100,37 @@
         const update = () => {
           requestAnimationFrame(update);
           if (mixer && isPlaying) mixer.update(clock.getDelta());
-
-          // Auto-rotate ringan agar terlihat dinamis
-          if (model && isPlaying) {
-            model.rotation.y += 0.005; // putar halus di sumbu Y
-          }
+          if (model && isPlaying) model.rotation.y += 0.005;
         };
         update();
 
-        // Otomatis play ketika marker ditemukan
+        // Marker ditemukan
         marker.addEventListener('markerFound', () => {
-          console.log('Marker ditemukan — mulai menari!');
+          console.log('Marker ditemukan — mulai menari dan musik!');
           if (mixer) {
             mixer.timeScale = 1;
             isPlaying = true;
           }
+          yospanAudio.play().catch(err => console.log("Autoplay dicegah:", err));
         });
 
-        // Otomatis pause ketika marker hilang
+        // Marker hilang
         marker.addEventListener('markerLost', () => {
-          console.log('Marker hilang — hentikan animasi.');
+          console.log('Marker hilang — pause semua.');
           if (mixer) {
             mixer.timeScale = 0;
             isPlaying = false;
           }
+          yospanAudio.pause();
         });
 
-        // Tombol kontrol manual
+        // Tombol Play / Pause manual
         playButton.addEventListener('click', () => {
           if (mixer) {
             mixer.timeScale = 1;
             isPlaying = true;
           }
+          yospanAudio.play();
         });
 
         pauseButton.addEventListener('click', () => {
@@ -136,6 +138,7 @@
             mixer.timeScale = 0;
             isPlaying = false;
           }
+          yospanAudio.pause();
         });
       });
     </script>
